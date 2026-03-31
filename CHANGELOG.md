@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0] - 2026-03-31
+
+### Changed
+- Category mode: default is now **auto-categorize** (AI analyzes content and creates categories dynamically)
+- Custom fixed categories available via `categories` config parameter
+- Removed hardcoded category table from Step 5
+
 ## [1.1.0] - 2026-03-31
 
 ### Added
