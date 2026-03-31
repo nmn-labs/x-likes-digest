@@ -42,7 +42,9 @@ Set these in your cron job or pass as context:
 | `vps_project_path` | Path to x-likes-digest on VPS | `/home/user/projects/x-likes-digest` |
 | `telegram_channel_id` | Telegram channel for delivery | `-100xxxxxxxxxx` |
 | `twitterapi_key` | twitterapi.io API key (use env var) | `$TWITTERAPI_KEY` |
-| `delivery_channels` | Target channels (optional) | `["telegram"]` or `["telegram", "line"]` |
+| `delivery_channels` | Target channels (optional) | `["telegram"]` or `["telegram", "discord", "slack", "line"]` |
+| `discord_channel_id` | Discord channel ID (if Discord enabled) | `1234567890` |
+| `slack_channel_id` | Slack channel (if Slack enabled) | `#digest` |
 | `line_user_id` | LINE User ID (if LINE enabled) | `Uxxxx` |
 | `recommend_count` | Number of recommendations | `12` |
 
@@ -130,7 +132,14 @@ Summary rules:
 
 Send to all configured `delivery_channels`. Each channel gets identical content.
 
-⚠️ **Telegram limit: 4096 chars per message.** Split by category boundary if exceeded, add `(1/2)` etc.
+⚠️ **Message length limits vary by channel.** Split by category boundary if exceeded, add `(1/2)` etc.
+
+| Channel | Char limit | Format |
+|---------|-----------|--------|
+| Telegram | 4096 | Markdown |
+| Discord | 2000 | Markdown |
+| Slack | 4000 | mrkdwn |
+| LINE | 5000 | Plain text |
 
 ⚠️ **X image URLs (pbs.twimg.com) must be proxied** — direct send fails due to referer check:
 1. `ssh {ssh_host} 'curl -sL -o /tmp/ximg_{i}.jpg "{media_url}"'`
