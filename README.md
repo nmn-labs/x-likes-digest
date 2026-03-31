@@ -8,7 +8,7 @@ An [OpenClaw](https://github.com/openclaw/openclaw) skill that delivers a daily 
 - **Smart summaries** — AI-generated summaries for posts, articles, and external links
 - **Image analysis** — Automatic SFW/NSFW classification via vision AI
 - **Recommendations** — Interest-based post discovery with feedback learning loop
-- **Multi-channel delivery** — Telegram, Discord, Slack, LINE
+- **Multi-channel delivery** — Telegram, Discord, Slack
 - **Volume handling** — Normal/split/light modes based on daily like count
 
 ## 📐 Architecture
@@ -80,7 +80,7 @@ openclaw cron add --name x-likes-digest-recommend \
 | `delivery_channels` | | `["telegram"]`, `["telegram", "discord"]`, etc. |
 | `discord_channel_id` | | Discord channel ID |
 | `slack_channel_id` | | Slack channel name |
-| `line_user_id` | | LINE User ID |
+| `line_user_id` | | LINE User ID (⚠️ not yet stable) |
 | `recommend_count` | | Number of recommendations (default: 12) |
 
 ## 📊 Modes
@@ -115,6 +115,63 @@ The recommendation engine learns from your behavior: posts you like after being 
 | 👟 | Fashion | Fashion, coordination |
 | 🈲 | NSFW | Sexy content |
 | 📦 | Other | Everything else |
+
+## 📋 Sample Output
+
+### Digest
+
+```
+📊 X Likes Digest — 2026/3/30
+━━━━━━━━━━━━━━━━━━
+📌 新規いいね: 37件
+
+📂 カテゴリ内訳:
+  💰 Crypto / Web3: 12件
+  🤖 AI / Tech: 8件
+  🎨 SFW Art: 5件
+  📦 Other: 12件
+
+🔥 注目トレンド:
+1. Bitcoin ETF inflows hit record $1.2B — institutional momentum accelerating
+2. Claude 4 benchmarks show 40% improvement in coding tasks
+3. New DeFi protocol launches with novel ve-tokenomics model
+```
+
+```
+📋 カテゴリ別 詳細
+━━━━━━━━━━━━━━━━━━
+
+💰 Crypto / Web3（12件）
+
+1. @crypto_analyst — Bitcoin ETF Weekly Flows
+   BlackRockのiSharesが$800M超の純流入を記録。累計AUMは$50Bに到達。
+   機関投資家の参入ペースが加速しており、2026年Q2の展望に注目。
+   📎 https://x.com/crypto_analyst/status/123456789
+
+🤖 AI / Tech（8件）
+
+1. @ai_researcher — 📝記事「Claude 4 Benchmark Analysis」
+   コーディング・数学・推論の3領域で前世代比40%改善。特にmulti-step
+   reasoningでの精度向上が顕著。ベンチマーク詳細と実用面での考察。
+   📎 https://x.com/ai_researcher/status/987654321
+```
+
+### Recommend
+
+```
+💡 おすすめポスト（12件）
+━━━━━━━━━━━━━━━━━━
+
+💰 Crypto / Web3
+1. Solana DEX volume surpasses Ethereum for third consecutive week
+   📌 あなたのDeFi・DEX関連のいいね傾向にマッチ
+   📎 https://x.com/defi_watcher/status/111222333
+
+🤖 AI / Tech
+1. Open-source alternative to Cursor IDE gains 10K GitHub stars in 48h
+   📌 AI×開発ツール系の記事を頻繁にいいね
+   📎 https://x.com/oss_news/status/444555666
+```
 
 ## 💰 Cost
 

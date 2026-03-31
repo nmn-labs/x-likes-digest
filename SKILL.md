@@ -3,7 +3,7 @@ name: x-likes-digest
 description: >-
   Daily digest of X (Twitter) liked posts with AI-powered categorization, summarization, and personalized recommendations.
   Use when: (1) setting up automated daily X likes digests, (2) generating categorized summaries of liked tweets,
-  (3) building interest-based tweet recommendations from like history, (4) delivering curated content digests to Telegram/LINE channels.
+  (3) building interest-based tweet recommendations from like history, (4) delivering curated content digests to Telegram/Discord/Slack channels.
   Supports two modes: digest (collect→categorize→summarize→deliver) and recommend (feedback→search→score→deliver).
   Requires: twitterapi.io API key, a VPS/server running the x-likes-digest data collector, SSH access, and a Telegram bot.
 ---
@@ -38,15 +38,27 @@ Set these in your cron job or pass as context:
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
-| `ssh_host` | SSH alias for VPS | `misato` |
+| `ssh_host` | SSH alias for VPS | `your-server` |
 | `vps_project_path` | Path to x-likes-digest on VPS | `/home/user/projects/x-likes-digest` |
 | `telegram_channel_id` | Telegram channel for delivery | `-100xxxxxxxxxx` |
 | `twitterapi_key` | twitterapi.io API key (use env var) | `$TWITTERAPI_KEY` |
-| `delivery_channels` | Target channels (optional) | `["telegram"]` or `["telegram", "discord", "slack", "line"]` |
+| `delivery_channels` | Target channels (optional) | `["telegram"]` or `["telegram", "discord", "slack"]` |
 | `discord_channel_id` | Discord channel ID (if Discord enabled) | `1234567890` |
 | `slack_channel_id` | Slack channel (if Slack enabled) | `#digest` |
-| `line_user_id` | LINE User ID (if LINE enabled) | `Uxxxx` |
+| `line_user_id` | LINE User ID (⚠️ LINE delivery not yet stable) | `Uxxxx` |
 | `recommend_count` | Number of recommendations | `12` |
+
+## ⚠️ API Cost Safety
+
+twitterapi.io is a **paid API** (~$0.015/request). To avoid accidental overspending:
+
+1. **Always check unique count first** — After fetching page 1, verify the number of unique tweet IDs. If duplicates exceed 50%, stop pagination immediately.
+2. **Set max pages** — Never paginate beyond 5 pages in a single run. If more data is needed, process across multiple days.
+3. **Prefer `last_tweets` over `advanced_search`** — `last_tweets` is cheaper and sufficient for like collection.
+4. **Monitor cursor values** — If the same `next_cursor` is returned twice, stop immediately (infinite loop).
+5. **Test with small batches** — When modifying search queries, always test with 1 page first and verify results before running full collection.
+
+Lesson learned: A pagination bug once consumed $9 in API credits by fetching the same data 6,500+ times. Always validate before scaling.
 
 ## Cron Setup
 
@@ -56,13 +68,13 @@ Two cron jobs, one skill. Example OpenClaw cron commands:
 # Digest — daily at 8:30 JST
 openclaw cron add --name x-likes-digest \
   --schedule "30 8 * * *" --tz Asia/Tokyo \
-  --message "Run x-likes-digest skill in digest mode. Config: ssh_host=misato, vps_project_path=/home/user/projects/x-likes-digest, telegram_channel_id=-100xxx, delivery_channels=[telegram]" \
+  --message "Run x-likes-digest skill in digest mode. Config: ssh_host=your-server, vps_project_path=/home/user/projects/x-likes-digest, telegram_channel_id=-100xxx, delivery_channels=[telegram]" \
   --channel telegram --timeout 900
 
 # Recommend — daily at 8:45 JST
 openclaw cron add --name x-likes-digest-recommend \
   --schedule "45 8 * * *" --tz Asia/Tokyo \
-  --message "Run x-likes-digest skill in recommend mode. Config: ssh_host=misato, vps_project_path=/home/user/projects/x-likes-digest, telegram_channel_id=-100xxx, recommend_count=12, delivery_channels=[telegram]" \
+  --message "Run x-likes-digest skill in recommend mode. Config: ssh_host=your-server, vps_project_path=/home/user/projects/x-likes-digest, telegram_channel_id=-100xxx, recommend_count=12, delivery_channels=[telegram]" \
   --channel telegram --timeout 600
 ```
 
