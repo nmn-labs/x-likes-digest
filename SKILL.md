@@ -22,15 +22,27 @@ twitterapi.io (article/search) ←→ OpenClaw Agent (this skill)
                                    Telegram / LINE delivery
 ```
 
-- **Data collector**: Node.js app on VPS, exports new likes via `export-data.ts`
+- **Data collector**: Node.js app on an always-on machine (VPS, home server, or local), exports new likes via `export-data.ts`
 - **This skill**: Agent-side processing — categorization, summarization, image handling, recommendation, delivery
 
 ## Prerequisites
 
-1. **VPS with x-likes-digest deployed** — See `references/setup-guide.md`
-2. **twitterapi.io API key** — stored in env var `$TWITTERAPI_KEY` on VPS
+1. **Always-on machine with x-likes-digest collector deployed** — VPS (recommended), home server, or a Mac/PC that stays powered on. See `references/setup-guide.md`
+2. **twitterapi.io API key** — stored in env var `$TWITTERAPI_KEY` on the collector machine
 3. **Telegram bot** — with access to target channel
-4. **SSH access** — agent must be able to `ssh <host>` to VPS
+4. **Access to collector DB** — either via SSH (remote) or direct file path (local)
+
+### Deployment Options
+
+| Setup | Collector runs on | Agent accesses DB via | `ssh_host` | `local_db_path` |
+|-------|-------------------|----------------------|------------|-----------------|
+| **Remote (VPS)** | VPS / cloud server | SSH | Required | — |
+| **Local** | Same machine as OpenClaw | Direct file path | — | Required |
+
+- **Remote (recommended)**: Collector runs 24/7 on a VPS. Agent uses SSH to read the DB and run export scripts. Set `ssh_host` and `vps_project_path`.
+- **Local**: Collector runs on the same machine as OpenClaw. No SSH needed. Set `local_db_path` to the absolute path of your collector directory instead of `ssh_host`/`vps_project_path`.
+
+> ⚠️ The collector needs to run daily (via system cron or similar). If your machine sleeps or shuts down, likes won't be collected for that day.
 
 ## Configuration
 
@@ -38,8 +50,9 @@ Set these in your cron job or pass as context:
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
-| `ssh_host` | SSH alias for VPS | `your-server` |
-| `vps_project_path` | Path to x-likes-digest on VPS | `/home/user/projects/x-likes-digest` |
+| `ssh_host` | SSH alias for remote server (remote mode) | `your-server` |
+| `vps_project_path` | Path to collector on remote server (remote mode) | `/home/user/projects/x-likes-digest` |
+| `local_db_path` | Absolute path to collector directory (local mode) | `/Users/you/x-likes-digest-collector` |
 | `telegram_channel_id` | Telegram channel for delivery | `-100xxxxxxxxxx` |
 | `twitterapi_key` | twitterapi.io API key (use env var) | `$TWITTERAPI_KEY` |
 | `delivery_channels` | Target channels (optional) | `["telegram"]` or `["telegram", "discord", "slack"]` |
@@ -115,8 +128,14 @@ Execute steps 1–6 in order. No skipping.
 
 ### Step 1: Data Export
 
+**Remote mode** (when `ssh_host` is set):
 ```bash
 ssh {ssh_host} "cd {vps_project_path} && npx tsx src/export-data.ts 2>/dev/null"
+```
+
+**Local mode** (when `local_db_path` is set):
+```bash
+cd {local_db_path} && npx tsx src/export-data.ts 2>/dev/null
 ```
 
 Check `new_likes_count`:
@@ -180,10 +199,17 @@ Send to all configured `delivery_channels`. Each channel gets identical content.
 | LINE | 5000 | Plain text |
 
 ⚠️ **X image URLs (pbs.twimg.com) must be proxied** — direct send fails due to referer check:
+
+**Remote mode:**
 1. `ssh {ssh_host} 'curl -sL -o /tmp/ximg_{i}.jpg "{media_url}"'`
 2. `scp {ssh_host}:/tmp/ximg_{i}.jpg /tmp/ximg_{i}.jpg`
 3. Send via `message` tool with `filePath=/tmp/ximg_{i}.jpg`
 4. Clean up tmp files on both sides
+
+**Local mode:**
+1. `curl -sL -o /tmp/ximg_{i}.jpg "{media_url}"`
+2. Send via `message` tool with `filePath=/tmp/ximg_{i}.jpg`
+3. Clean up tmp file
 
 #### Message 1: Summary
 
@@ -224,8 +250,14 @@ If image download fails, send URL as text fallback.
 
 ### Step 7: Mark Digested (immediately after Step 6)
 
+**Remote mode:**
 ```bash
 ssh {ssh_host} "cd {vps_project_path} && npx tsx src/export-data.ts --mark-digested 2>/dev/null"
+```
+
+**Local mode:**
+```bash
+cd {local_db_path} && npx tsx src/export-data.ts --mark-digested 2>/dev/null
 ```
 
 ### Completion
@@ -242,9 +274,16 @@ Execute steps 1–5 in order.
 
 Evaluate previous day's recommendations against today's new likes:
 
+**Remote mode:**
 ```bash
 ssh {ssh_host} "cd {vps_project_path} && sqlite3 data/likes.db \"
 SELECT tweet_id FROM recommendations WHERE recommended_date = date('now', '-1 day') AND was_liked IS NULL;\""
+```
+
+**Local mode:**
+```bash
+sqlite3 {local_db_path}/data/likes.db "
+SELECT tweet_id FROM recommendations WHERE recommended_date = date('now', '-1 day') AND was_liked IS NULL;"
 ```
 
 - Liked → `was_liked = 1`, keyword weight **+0.3**
@@ -259,8 +298,14 @@ FROM likes GROUP BY author_username HAVING COUNT(*) >= 3;
 
 ### Step 2: Interest Profile
 
+**Remote mode:**
 ```bash
 ssh {ssh_host} "cd {vps_project_path} && sqlite3 data/likes.db 'SELECT * FROM interest_profile ORDER BY weight DESC LIMIT 50'"
+```
+
+**Local mode:**
+```bash
+sqlite3 {local_db_path}/data/likes.db 'SELECT * FROM interest_profile ORDER BY weight DESC LIMIT 50'
 ```
 
 If empty, build from all likes data (keyword frequency, author weights, category distribution).
