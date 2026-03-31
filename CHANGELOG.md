@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0] - 2026-03-31
+
+### Added
+- CONTRIBUTING.md with development guidelines
+- GitHub Issue templates (bug report, feature request)
+- Pull Request template
+- GitHub Actions CI workflow (file validation, secret detection, link check)
+
 ## [1.0.0] — 2026-03-31
 
 ### Added

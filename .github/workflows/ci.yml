@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required files exist
+        run: |
+          test -f SKILL.md || (echo "❌ SKILL.md missing" && exit 1)
+          test -f README.md || (echo "❌ README.md missing" && exit 1)
+          test -f LICENSE || (echo "❌ LICENSE missing" && exit 1)
+          test -f references/setup-guide.md || (echo "❌ references/setup-guide.md missing" && exit 1)
+          test -f references/spec.md || (echo "❌ references/spec.md missing" && exit 1)
+          echo "✅ All required files present"
+
+      - name: Validate SKILL.md frontmatter
+        run: |
+          head -1 SKILL.md | grep -q "^---" || (echo "❌ SKILL.md missing frontmatter" && exit 1)
+          grep -q "^name:" SKILL.md || (echo "❌ SKILL.md missing name field" && exit 1)
+          grep -q "^description:" SKILL.md || (echo "❌ SKILL.md missing description field" && exit 1)
+          echo "✅ SKILL.md frontmatter valid"
+
+      - name: Check for secrets/credentials
+        run: |
+          # Check for hardcoded tokens, keys, or passwords
+          if grep -rEi '(api[_-]?key|token|password|secret)\s*[:=]\s*["\x27][a-zA-Z0-9]{20,}' \
+            --include='*.md' --include='*.yml' --include='*.yaml' \
+            --exclude-dir=.git .; then
+            echo "❌ Potential secrets detected!"
+            exit 1
+          fi
+          echo "✅ No secrets detected"
+
+      - name: Validate markdown links
+        run: |
+          # Check internal links exist
+          grep -oP '\[.*?\]\(((?!https?://|#).*?)\)' README.md | \
+            grep -oP '\(.*?\)' | tr -d '()' | while read -r link; do
+              if [ ! -f "$link" ]; then
+                echo "⚠️ Broken link in README.md: $link"
+              fi
+            done
+          echo "✅ Link check complete"
+
+      - name: Check CHANGELOG.md format
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            grep -q "## " CHANGELOG.md || echo "⚠️ CHANGELOG.md has no version headers"
+            echo "✅ CHANGELOG.md exists and has content"
+          else
+            echo "⚠️ No CHANGELOG.md found"
+          fi
