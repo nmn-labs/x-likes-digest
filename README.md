@@ -16,7 +16,7 @@ An [OpenClaw](https://github.com/openclaw/openclaw) skill that delivers a daily 
 ```
 ┌─────────────┐     ┌──────────────────┐     ┌──────────────────┐
 │  X Official  │────▶│  Data Collector   │────▶│    SQLite DB      │
-│     API      │     │  (VPS, Node.js)   │     │  (likes, recs)    │
+│     API      │     │  (Node.js)        │     │  (likes, recs)    │
 └─────────────┘     └──────────────────┘     └────────┬─────────┘
                                                        │
                     ┌──────────────────┐               │
@@ -43,7 +43,11 @@ An [OpenClaw](https://github.com/openclaw/openclaw) skill that delivers a daily 
 openclaw skill add nmn-labs/x-likes-digest
 ```
 
-### 2. Deploy the data collector on your VPS
+### 2. Deploy the data collector
+
+The collector runs on any always-on machine — **VPS** (recommended), home server, or even your local Mac/PC if it stays powered on.
+
+> ⚠️ The collector must run daily via system cron. If the machine sleeps or shuts down, likes won't be collected that day.
 
 ```bash
 git clone https://github.com/nmn-labs/x-likes-digest-collector.git
@@ -55,26 +59,36 @@ npx tsx src/auth-setup.ts  # OAuth flow in browser
 
 ### 3. Set up cron jobs
 
+**Remote setup** (collector on VPS/server):
 ```bash
-# Daily digest at 8:30 JST
 openclaw cron add --name x-likes-digest \
   --schedule "30 8 * * *" --tz Asia/Tokyo \
   --message "Run x-likes-digest skill in digest mode. Config: ssh_host=myserver, vps_project_path=/home/user/x-likes-digest, telegram_channel_id=-100xxx" \
   --channel telegram --timeout 900
 
-# Daily recommendations at 8:45 JST
 openclaw cron add --name x-likes-digest-recommend \
   --schedule "45 8 * * *" --tz Asia/Tokyo \
   --message "Run x-likes-digest skill in recommend mode. Config: ssh_host=myserver, vps_project_path=/home/user/x-likes-digest, telegram_channel_id=-100xxx, recommend_count=12" \
   --channel telegram --timeout 600
 ```
 
+**Local setup** (collector on the same machine):
+```bash
+openclaw cron add --name x-likes-digest \
+  --schedule "30 8 * * *" --tz Asia/Tokyo \
+  --message "Run x-likes-digest skill in digest mode. Config: local_db_path=/Users/you/x-likes-digest-collector, telegram_channel_id=-100xxx" \
+  --channel telegram --timeout 900
+```
+
 ## ⚙️ Configuration
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `ssh_host` | ✅ | SSH alias for VPS |
-| `vps_project_path` | ✅ | Path to collector on VPS |
+| `ssh_host` | ✅* | SSH alias for remote server (remote mode) |
+| `vps_project_path` | ✅* | Path to collector on remote server (remote mode) |
+| `local_db_path` | ✅* | Absolute path to collector directory (local mode) |
+
+> *Either `ssh_host` + `vps_project_path` (remote) **or** `local_db_path` (local) is required.
 | `telegram_channel_id` | ✅ | Telegram channel for delivery |
 | `twitterapi_key` | ✅ | twitterapi.io API key (env var) |
 | `delivery_channels` | | `["telegram"]`, `["telegram", "discord"]`, etc. |
