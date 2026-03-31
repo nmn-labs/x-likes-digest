@@ -47,6 +47,35 @@ Set these in your cron job or pass as context:
 | `slack_channel_id` | Slack channel (if Slack enabled) | `#digest` |
 | `line_user_id` | LINE User ID (⚠️ LINE delivery not yet stable) | `Uxxxx` |
 | `recommend_count` | Number of recommendations | `12` |
+| `categories` | Custom category list (optional, see below) | `[{emoji, name, criteria}]` |
+
+### Category Modes
+
+**Default: Auto-categorize (no `categories` set)**
+
+The agent analyzes post content and automatically assigns categories based on the actual topics found.
+Rules for auto-categorization:
+- Analyze all posts first, then identify 5–10 natural groupings
+- Each category gets an appropriate emoji and short label
+- X Articles (`x.com/i/article/` format) are always a separate 📝 category
+- NSFW detection (from Step 4) always creates a 🈲 category if applicable
+- Avoid "Other" — every post should fit a meaningful category
+- Keep category names concise (2–3 words max)
+
+**Custom: Fixed categories (`categories` set)**
+
+When `categories` is provided in config, use the specified categories instead of auto-detection.
+
+Format:
+```json
+[
+  {"emoji": "💰", "name": "Crypto / Web3", "criteria": "Cryptocurrency, blockchain, DeFi, trading"},
+  {"emoji": "🤖", "name": "AI / Tech", "criteria": "AI, programming, tools, automation"},
+  {"emoji": "📦", "name": "Other", "criteria": "Everything else"}
+]
+```
+
+Posts that don't match any custom category go to the last entry (typically "Other").
 
 ## ⚠️ API Cost Safety
 
@@ -119,18 +148,15 @@ For posts with `has_media=1`: analyze `media_urls` with `image` tool.
 
 ### Step 5: Categorize & Summarize
 
-Categories (display in this order):
+**If `categories` is set in config:** use those fixed categories (see Configuration → Category Modes).
 
-| Emoji | Category | Criteria |
-|-------|----------|----------|
-| 💰 | Crypto / Web3 | Cryptocurrency, blockchain, DeFi, trading |
-| 🤖 | AI / Tech | AI, programming, tools, automation |
-| 📝 | X Articles | `x.com/i/article/` format posts |
-| 🎨 | SFW Art | Illustrations, fan art (no exposure) |
-| 💼 | Biz / Marketing | Business, startups, marketing |
-| 👟 | Fashion | Fashion, coordination |
-| 🈲 | NSFW | Sexy content (from Step 4) |
-| 📦 | Other | Everything else |
+**If `categories` is NOT set (default):** auto-categorize based on post content:
+1. Read all posts from Step 1–4
+2. Identify 5–10 natural topic groupings from the actual content
+3. Assign each post to the most fitting category
+4. 📝 X Articles (`x.com/i/article/`) and 🈲 NSFW (from Step 4) are always separate categories
+5. Avoid "Other" — find a meaningful label for every post
+6. Choose an appropriate emoji for each category
 
 Summary rules:
 - **X articles**: Article title + 200–400 char summary with key points/numbers/conclusions
