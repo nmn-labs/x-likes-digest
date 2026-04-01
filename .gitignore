@@ -10,3 +10,18 @@ Thumbs.db
 
 # Packages
 *.skill
+node_modules/
+dist/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Data
+data/
+*.db
+.oauth-state.json
+
+# Logs
+*.log

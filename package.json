@@ -1,0 +1,38 @@
+{
+  "name": "x-likes-digest-collector",
+  "version": "1.0.0",
+  "description": "Data collector for X Likes Digest — collects and enriches liked tweets from X API into SQLite",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "collect": "tsx src/collect-enrich.ts",
+    "oauth:setup": "tsx src/oauth-setup.ts",
+    "oauth:exchange": "tsx src/oauth-exchange.ts",
+    "export": "tsx src/export-data.ts",
+    "recommend": "tsx src/recommender.ts"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [],
+  "author": "nmn-labs",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@mozilla/readability": "^0.6.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.6.2",
+    "dotenv": "^17.3.1",
+    "linkedom": "^0.18.12",
+    "node-fetch": "^3.3.2",
+    "twitter-api-v2": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/mozilla__readability": "^0.4.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
