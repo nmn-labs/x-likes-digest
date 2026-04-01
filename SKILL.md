@@ -120,6 +120,18 @@ openclaw cron add --name x-likes-digest-recommend \
   --channel telegram --timeout 600
 ```
 
+> 💡 **Tip:** If the cron agent can't locate SKILL.md, replace the `--message` with the full step-by-step procedure. See "Cron Message Best Practice" below.
+
+### Cron Message Best Practice
+
+⚠️ **Cron sessions may not find SKILL.md** — OpenClaw cron sessions run in isolated contexts and may fail to locate skill files on disk. If your cron session repeatedly fails to follow the skill steps or falls back to running VPS scripts directly:
+
+**Recommended: Embed the full procedure in the cron message itself.**
+
+Instead of "Run x-likes-digest skill in digest mode", write the complete step-by-step instructions directly in the `--message` field. This ensures the agent follows the correct procedure regardless of skill file discovery.
+
+See the [OpenClaw cron docs](https://docs.openclaw.ai/cli/cron) for message formatting tips.
+
 ---
 
 ## Mode: Digest
@@ -178,9 +190,9 @@ For posts with `has_media=1`: analyze `media_urls` with `image` tool.
 6. Choose an appropriate emoji for each category
 
 Summary rules:
-- **X articles**: Article title + 200–400 char summary with key points/numbers/conclusions
+- **X articles**: Article title + 200–400 char summary with key points/numbers/conclusions. Include specific data points, names, and conclusions — not just the topic
 - **External links**: Article title + 200–400 char summary
-- **Normal posts**: 100–200 char detailed summary explaining what's interesting/new
+- **Normal posts**: 100–200 char detailed summary explaining what's interesting/new. **Title-only one-line summaries are strictly prohibited** — always explain the content
 - **Image-only**: Image analysis + author context (50+ chars)
 - **High engagement**: Note if >10K views or >100 likes
 - **Never guess** — write from source data only
@@ -335,9 +347,10 @@ Send to all configured `delivery_channels`:
 ━━━━━━━━━━━━━━━━━━
 
 {emoji} {category}
-1. {post summary}
+1. @{author} — {title}
+   {100–200 char detailed summary explaining what's interesting/new}
    📌 {why recommended — which interest pattern matched}
-   📎 {URL}
+   📎 https://x.com/{author}/status/{tweet_id}
 ```
 
 Record recommendations:
@@ -359,3 +372,4 @@ Reply `NO_REPLY`. Do not send execution summaries anywhere.
 4. Never output all accumulated data — only `digested=0` items
 5. Never send cron execution summaries to any channel
 6. Full web_fetch is OK — cron sessions have token headroom
+7. Never run the collector's `index.ts` directly — always use `export-data.ts` for data retrieval. `index.ts` is the collector's standalone pipeline and bypasses agent-side categorization/summarization
