@@ -280,63 +280,131 @@ Reply `NO_REPLY`. Do not send execution summaries anywhere.
 
 ## Mode: Recommend
 
-Execute steps 1–5 in order.
+Execute steps 1–6 in order. This mode uses LLM-powered profiling and scoring for high-precision recommendations.
 
-### Step 1: Feedback Update
+### Step 1: LLM Interest Profiling (weekly refresh)
 
-Evaluate previous day's recommendations against today's new likes:
+Check if a profile exists and is fresh:
+
+**Remote mode:**
+```bash
+ssh {ssh_host} "cd {vps_project_path} && sqlite3 data/likes.db \"SELECT value FROM kv WHERE key = 'llm_profile_updated_at';\""
+```
+
+**Local mode:**
+```bash
+sqlite3 {local_db_path}/data/likes.db "SELECT value FROM kv WHERE key = 'llm_profile_updated_at';"
+```
+
+If empty or older than 7 days, regenerate the profile:
+
+1. Fetch the last 100 liked tweets:
+   **Remote:** `ssh {ssh_host} "cd {vps_project_path} && sqlite3 data/likes.db 'SELECT author_username, text, category, link_urls FROM likes ORDER BY liked_at DESC LIMIT 100'"`
+   **Local:** `sqlite3 {local_db_path}/data/likes.db 'SELECT author_username, text, category, link_urls FROM likes ORDER BY liked_at DESC LIMIT 100'`
+
+2. Analyze with LLM — produce a natural-language interest profile covering:
+   - **Topic patterns**: What subjects does this person care about? (e.g., "AI agent infrastructure, not AI hype")
+   - **Depth preference**: Does this person like surface news or deep technical content?
+   - **Style preference**: What tone/format resonates? (threads, articles, hot takes, tutorials)
+   - **Author affinity**: Which authors appear frequently and why?
+   - **Anti-patterns**: What does this person consistently NOT like? (e.g., "generic crypto price predictions")
+   - **Emerging interests**: Recent shifts in topic focus
+
+3. Store the profile:
+   **Remote:**
+   ```bash
+   ssh {ssh_host} "cd {vps_project_path} && sqlite3 data/likes.db \"INSERT OR REPLACE INTO kv (key, value) VALUES ('llm_interest_profile', '<profile_text>'), ('llm_profile_updated_at', datetime('now'));\""
+   ```
+   **Local:**
+   ```bash
+   sqlite3 {local_db_path}/data/likes.db "INSERT OR REPLACE INTO kv (key, value) VALUES ('llm_interest_profile', '<profile_text>'), ('llm_profile_updated_at', datetime('now'));"
+   ```
+
+> ⚠️ The `kv` table must exist. If it doesn't, create it first:
+> ```sql
+> CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT);
+> ```
+
+If fresh (≤7 days), load the existing profile:
+```bash
+ssh {ssh_host} "cd {vps_project_path} && sqlite3 data/likes.db \"SELECT value FROM kv WHERE key = 'llm_interest_profile';\""
+```
+
+### Step 2: Feedback Analysis (daily)
+
+Evaluate previous day's recommendations:
 
 **Remote mode:**
 ```bash
 ssh {ssh_host} "cd {vps_project_path} && sqlite3 data/likes.db \"
-SELECT tweet_id FROM recommendations WHERE recommended_date = date('now', '-1 day') AND was_liked IS NULL;\""
+SELECT r.tweet_id, r.reason, r.score
+FROM recommendations r
+WHERE r.recommended_date = date('now', '-1 day') AND r.was_liked IS NULL;\""
 ```
 
 **Local mode:**
 ```bash
 sqlite3 {local_db_path}/data/likes.db "
-SELECT tweet_id FROM recommendations WHERE recommended_date = date('now', '-1 day') AND was_liked IS NULL;"
+SELECT r.tweet_id, r.reason, r.score
+FROM recommendations r
+WHERE r.recommended_date = date('now', '-1 day') AND r.was_liked IS NULL;"
 ```
 
-- Liked → `was_liked = 1`, keyword weight **+0.3**
-- Not liked → `was_liked = 0`, keyword weight **-0.1**
+Cross-reference with today's likes to determine which were actually liked:
+- Liked → `was_liked = 1`
+- Not liked → `was_liked = 0`
 
-Update author weights:
-```sql
-INSERT OR REPLACE INTO interest_profile (category, keyword, weight)
-SELECT 'author', author_username, COUNT(*) * 0.5
-FROM likes GROUP BY author_username HAVING COUNT(*) >= 3;
-```
-
-### Step 2: Interest Profile
-
-**Remote mode:**
-```bash
-ssh {ssh_host} "cd {vps_project_path} && sqlite3 data/likes.db 'SELECT * FROM interest_profile ORDER BY weight DESC LIMIT 50'"
-```
-
-**Local mode:**
-```bash
-sqlite3 {local_db_path}/data/likes.db 'SELECT * FROM interest_profile ORDER BY weight DESC LIMIT 50'
-```
-
-If empty, build from all likes data (keyword frequency, author weights, category distribution).
+**Negative signal analysis (LLM):** For posts that were NOT liked, analyze why they missed:
+- Was the topic off? The author unfamiliar? The format wrong?
+- Store insights as exclusion patterns:
+  ```sql
+  INSERT OR REPLACE INTO kv (key, value) 
+  VALUES ('negative_signals', '<accumulated exclusion patterns as text>');
+  ```
 
 ### Step 3: Search
 
-Generate 5–7 queries from top keywords × categories. Add `min_faves:50` for quality.
+Load the LLM interest profile and negative signals:
+```bash
+ssh {ssh_host} "cd {vps_project_path} && sqlite3 data/likes.db \"SELECT key, value FROM kv WHERE key IN ('llm_interest_profile', 'negative_signals');\""
+```
+
+Generate 5–7 search queries informed by the profile. Each query should target a specific interest dimension:
+- 2–3 queries for core interests (highest-confidence topics)
+- 1–2 queries for emerging interests (recent shifts)
+- 1–2 queries for serendipity (adjacent topics the user might discover)
+
+Add `min_faves:50` for quality filtering.
 
 ```bash
 curl -s "https://api.twitterapi.io/twitter/tweet/advanced_search?query={query}&queryType=Latest" \
   -H "x-api-key: {twitterapi_key}"
 ```
 
-### Step 4: Score & Filter
+⚠️ **API cost safety**: Max 7 queries, 1 page each. No pagination. Verify unique tweet IDs before proceeding.
 
-Score by: engagement (likes/RTs), relevance (keyword match), author weight (bonus for liked authors).
+### Step 4: LLM Scoring & Filter
+
+Take all unique candidates from Step 3 (typically 30–70 tweets) and score them using LLM:
+
+**Provide to the LLM:**
+- The interest profile from Step 1
+- The negative signals from Step 2
+- Each candidate tweet's text, author, engagement stats, and any link content
+
+**Score each candidate 0–10:**
+- **9–10**: Almost certainly matches — exact topic + preferred depth + good author
+- **7–8**: Strong match — right topic area, interesting angle
+- **5–6**: Possible interest — adjacent topic or unfamiliar author with good content
+- **3–4**: Weak match — only surface-level keyword overlap
+- **0–2**: Anti-pattern match — topics/styles the user avoids
+
+**Selection rules:**
+- Take top `{recommend_count}` posts (default: 12) scoring ≥5
 - **Max 3 per category** for diversity
-- Exclude already-liked posts
-- Select exactly `{recommend_count}` items (default: 12)
+- **At least 2 serendipity picks** (score 5–7 from non-core topics) for discovery
+- Exclude already-liked posts (check against DB)
+- Exclude posts matching negative signal patterns
 
 ### Step 5: Deliver & Record
 
@@ -350,13 +418,30 @@ Send to all configured `delivery_channels`:
 1. @{author} — {title}
    {100–200 char detailed summary explaining what's interesting/new}
    📌 {why recommended — which interest pattern matched}
+   🎯 スコア: {score}/10
    📎 https://x.com/{author}/status/{tweet_id}
 ```
 
-Record recommendations:
+⚠️ Split by category boundary if message exceeds channel char limit. Add `(1/2)` etc.
+
+Record recommendations with score:
 ```sql
-INSERT INTO recommendations (tweet_id, recommended_date, reason) VALUES ('{tweet_id}', date('now'), '{reason}');
+INSERT INTO recommendations (tweet_id, recommended_date, reason, score) 
+VALUES ('{tweet_id}', date('now'), '{reason}', {score});
 ```
+
+> ⚠️ If the `score` column doesn't exist in `recommendations`, add it:
+> ```sql
+> ALTER TABLE recommendations ADD COLUMN score REAL;
+> ```
+
+### Step 6: Profile Maintenance
+
+If today's feedback from Step 2 shows a significant pattern shift (>30% of liked recommendations are from a new topic), trigger an early profile refresh by clearing the timestamp:
+```sql
+UPDATE kv SET value = '2000-01-01' WHERE key = 'llm_profile_updated_at';
+```
+This ensures the next run rebuilds the profile in Step 1.
 
 ### Completion
 
